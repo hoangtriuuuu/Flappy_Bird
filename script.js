@@ -97,7 +97,7 @@ function drawBird() {
 
 function updatePipes() {
     if (pipes.length === 0 || pipes[pipes.length - 1].x < canvas.width - 200) {
-        let gapHeight = 150;
+        let gapHeight = 300;
         let pipeY = Math.random() * (canvas.height - gapHeight - 100) + 50;
         pipes.push({ x: canvas.width, y: pipeY, width: 80, height: gapHeight });
     }

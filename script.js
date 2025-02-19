@@ -97,7 +97,7 @@ function drawBird() {
 
 function updatePipes() {
     if (pipes.length === 0 || pipes[pipes.length - 1].x < canvas.width - 200) {
-        let gapHeight = 300;
+        let gapHeight = 150;
         let pipeY = Math.random() * (canvas.height - gapHeight - 100) + 50;
         pipes.push({ x: canvas.width, y: pipeY, width: 80, height: gapHeight });
     }
@@ -152,13 +152,21 @@ function gameOver() {
 
 document.addEventListener("keydown", function(event) {
     if (event.code === "Space") {
-        bird.velocity = lift;
-        bird.isFlapping = true;
-        bird.angle = -20;
-        flapSound.play().catch(err => console.log("Audio Play Error: ", err));
-        setTimeout(() => bird.isFlapping = false, 150);
+        flap();
     }
 });
+
+document.addEventListener("touchstart", function() {
+    flap();
+});
+
+function flap() {
+    bird.velocity = lift;
+    bird.isFlapping = true;
+    bird.angle = -20;
+    flapSound.play().catch(err => console.log("Audio Play Error: ", err));
+    setTimeout(() => bird.isFlapping = false, 150);
+}
 
 newGameBtn.addEventListener("click", startGame);
 continueGameBtn.addEventListener("click", startGame);

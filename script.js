@@ -43,6 +43,60 @@ let gameRunning = false;
 
 function startGame() {
     menu.style.display = "none";
+    canvas.style.display = "block"; // Hiện game lên ngay
+    countdownScreen.style.visibility = "visible";
+
+    // Hiển thị kỷ lục cũ
+    let highScore = localStorage.getItem("highScore") || 0;
+    document.getElementById("highScoreDisplay").innerHTML = `<img src="./Image/${highScore}.png" width="20" height="30">`;
+
+    let countdown = 3;
+    countdownText.innerHTML = `<img src="./Image/${countdown}.png" width="30" height="60">`;
+
+    bird.y = 250;
+    bird.velocity = 0;
+    bird.isFlapping = false;
+    bird.angle = 0;
+    pipes = [];
+    score = 0;
+    gameRunning = true;
+
+    disableControls(); // Chặn điều khiển
+    gameLoop(); // Chạy game ngay lập tức
+
+    let countdownInterval = setInterval(() => {
+        countdown--;
+        if (countdown > 0) {
+            countdownText.innerHTML = `<img src="./Image/${countdown}.png" width="40" height="60">`;
+        } else {
+            clearInterval(countdownInterval);
+            countdownScreen.style.visibility = "hidden";
+            enableControls(); // Bật điều khiển khi đếm xong
+        }
+    }, 1000);
+}
+
+
+function disableControls() {
+    document.removeEventListener("keydown", flap);
+    document.removeEventListener("touchstart", flap);
+}
+
+function enableControls() {
+    document.addEventListener("keydown", flap);
+    document.addEventListener("touchstart", flap);
+}
+
+function flap() {
+    if (!gameRunning) return;
+    bird.velocity = lift;
+    bird.isFlapping = true;
+    bird.angle = -20;
+    flapSound.play().catch(err => console.log("Audio Play Error: ", err));
+    setTimeout(() => bird.isFlapping = false, 150);
+}
+
+function runGame() {
     canvas.style.display = "block";
     bird.y = 250;
     bird.velocity = 0;
@@ -54,8 +108,10 @@ function startGame() {
     gameLoop();
 }
 
+
 function gameLoop() {
     if (!gameRunning) return;
+
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawBackground();
     updateBird();
@@ -63,10 +119,19 @@ function gameLoop() {
     drawPipes();
     drawBird();
     drawScore();
+    drawHighScore(); // 🏆 Vẽ high score ở góc trái trên cùng
+
     requestAnimationFrame(gameLoop);
 }
 
+
 function updateBird() {
+    if (countdownScreen.style.visibility === "visible") {
+        bird.velocity = 0; // Ngăn chim rơi xuống
+        bird.isFlapping = !bird.isFlapping; // Đổi trạng thái cánh mỗi frame
+        return;
+    }
+
     bird.velocity += gravity;
     bird.y += bird.velocity;
     
@@ -80,6 +145,7 @@ function updateBird() {
         gameOver();
     }
 }
+
 
 function drawBird() {
     ctx.save();
@@ -97,12 +163,18 @@ function drawBird() {
 
 function updatePipes() {
     if (pipes.length === 0 || pipes[pipes.length - 1].x < canvas.width - 200) {
-        let gapHeight = 300;
+        let gapHeight = 150;
         let pipeY = Math.random() * (canvas.height - gapHeight - 100) + 50;
         pipes.push({ x: canvas.width, y: pipeY, width: 80, height: gapHeight });
     }
+
+    // Nếu đang đếm ngược thì không di chuyển ống nước
+    if (countdownScreen.style.visibility === "visible") {
+        return;
+    }
+
     pipes.forEach(pipe => {
-        pipe.x -= 2;
+        pipe.x -= 2; // Ống nước di chuyển bình thường sau khi đếm xong
         if (pipe.x + pipe.width < 0) {
             pipes.shift();
             score++;
@@ -115,19 +187,43 @@ function updatePipes() {
     });
 }
 
+
 function drawPipes() {
     pipes.forEach(pipe => {
-        ctx.drawImage(pipeTopImg, pipe.x, pipe.y - pipeTopImg.height, pipe.width, pipeTopImg.height * 1.5);
+        // Vẽ ống trên
+        ctx.drawImage(pipeTopImg, pipe.x, pipe.y - pipeTopImg.height * 1.5, pipe.width, pipeTopImg.height * 1.5);
+        // Vẽ ống dưới
         ctx.drawImage(pipeBottomImg, pipe.x, pipe.y + pipe.height, pipe.width, pipeBottomImg.height * 1.5);
     });
 }
 
+
 function checkCollision(bird, pipe) {
-    return (
-        (bird.x < pipe.x + pipe.width && bird.x + bird.width > pipe.x && bird.y < pipe.y) ||
-        (bird.x < pipe.x + pipe.width && bird.x + bird.width > pipe.x && bird.y + bird.height > pipe.y + pipe.height)
-    );
+    let birdRight = bird.x + bird.width;
+    let birdBottom = bird.y + bird.height;
+
+    let pipeLeft = pipe.x;
+    let pipeRight = pipe.x + pipe.width;
+    let pipeTopBottom = pipe.y; // Đỉnh của khoảng trống giữa ống
+
+    let pipeBottomTop = pipe.y + pipe.height; // Đáy của khoảng trống giữa ống
+
+    let pipeTopHeight = pipeTopImg.height * 10; // Độ cao chính xác của pipeTop
+    let pipeBottomHeight = pipeBottomImg.height * 10; // Độ cao chính xác của pipeBottom
+
+    // Va chạm với ống trên
+    if (bird.x < pipeRight && birdRight > pipeLeft && bird.y < pipeTopBottom) {
+        return true;
+    }
+
+    // Va chạm với ống dưới
+    if (bird.x < pipeRight && birdRight > pipeLeft && birdBottom > pipeBottomTop) {
+        return true;
+    }
+
+    return false;
 }
+
 
 function drawScore() {
     let scoreStr = score.toString();
@@ -139,25 +235,58 @@ function drawScore() {
     }
 }
 
+function drawHighScore() {
+    let highScore = localStorage.getItem("highScore") || 0;
+    let scoreStr = highScore.toString();
+    let startX = 10; // Góc trái trên cùng
+    let startY = 10; // Khoảng cách từ trên xuống
+
+    for (let i = 0; i < scoreStr.length; i++) {
+        let digit = parseInt(scoreStr[i]);
+        ctx.drawImage(scoreDigits[digit], startX + i * 20, startY, 20, 30);
+    }
+}
+
+
+
 function drawBackground() {
     ctx.drawImage(backgroundImg, 0, 0, canvas.width, canvas.height);
 }
 
 function gameOver() {
     gameRunning = false;
-    hitSound.play().catch(err => console.log("Audio Play Error: ", err));
+
+    // Kiểm tra và lưu kỷ lục nếu cần
+    let highScore = localStorage.getItem("highScore") || 0;
+    if (score > highScore) {
+        localStorage.setItem("highScore", score);
+    }
+
+    setTimeout(showMenu,0); // Đợi 2 giây rồi quay lại menu
+}
+
+function showMenu() {
     menu.style.display = "block";
     canvas.style.display = "none";
 }
 
+
 document.addEventListener("keydown", function(event) {
     if (event.code === "Space") {
-        flap();
+        bird.velocity = lift;
+        bird.isFlapping = true;
+        bird.angle = -20;
+        flapSound.play().catch(err => console.log("Audio Play Error: ", err));
+        setTimeout(() => bird.isFlapping = false, 150);
     }
 });
 
 document.addEventListener("touchstart", function() {
-    flap();
+    bird.velocity = lift;
+    bird.isFlapping = true;
+    bird.angle = -20;
+    flapSound.play().catch(err => console.log("Audio Play Error: ", err));
+    setTimeout(() => bird.isFlapping = false, 150);
 });
 
 function flap() {
